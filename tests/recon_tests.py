@@ -1,54 +1,58 @@
-"""
+'''
 Various tests to compare different flavours of recon 2.
 Updated: 10 Apr 15 by Kieran Smallbone
-"""
-
+'''
+# pylint: disable=invalid-name
+# pylint: disable=too-many-arguments
+# pylint: disable=too-many-branches
+# pylint: disable=too-many-locals
+# pylint: disable=too-many-statements
 import itertools
 import numpy
 import os
 import re
+
+import gurobipy
+
+import libsbml
 import scipy.sparse as sparse
 
-# http://www.gurobi.com/documentation/6.0/quickstart_mac/py_python_interface.html
-import gurobipy
-# http://frank-fbergmann.blogspot.co.uk/2014/05/libsbml-python-bindings-5101.html
-import libsbml
 
-
-INF = numpy.inf
-NAN = numpy.nan
+INF = float('inf')
+NAN = float('nan')
 
 
 def run_all():
-    """Runs all the tests on all the models"""
+    '''Runs all the tests on all the models'''
     model_names, model_path = list_models()
     for name in model_names:
-#         if name in ['recon_2.2']:
         if name[:9] == 'recon_2.2':
             display_errors = True
         else:
             display_errors = False
         test_model(name, model_path, display_errors)
 
+        print '\n----------\n\n'
+
 
 def test_model(name, model_path, display_errors=False):
-    """Runs all the tests on one model"""
-    print '\n\n%s'%name
+    '''Runs all the tests on one model'''
+    print name
     model_filename = os.path.join(model_path, name + '.xml')
     sbml = read_sbml(model_filename)
     model_stats(sbml, display_errors)
     model_balancing(sbml, display_errors)
-#     if name in ['recon_2.2']:
-    if name[:9] == 'recon_2.2':
-        max_fluxes(sbml)
+    # if name[:9] == 'recon_2.2':
+    max_fluxes(sbml)
 
 
-def model_stats(sbml, display_errors = False):
-    """Statistics on the number, and type, of species, reactions and genes in a model"""
+def model_stats(sbml, display_errors=False):
+    '''Statistics on the number, and type, of species, reactions and genes in a
+    model'''
     model = sbml.getModel()
 
     # species statistics by SBO term
-    print '\n%g\t%s'%(model.getNumSpecies(), 'species')
+    print '\n%g\t%s' % (model.getNumSpecies(), 'species')
     sbo_count = {}
     for species in model.getListOfSpecies():
         sbo = species.getSBOTerm()
@@ -56,14 +60,16 @@ def model_stats(sbml, display_errors = False):
             sbo_count[sbo] = 0
         sbo_count[sbo] += 1
         if display_errors and (sbo == -1):
-            print '%s\t%s\t%s'%('species', species.getId(), 'has no SBO term')
+            print '%s\t%s\t%s' % ('species', species.getId(),
+                                  'has no SBO term')
     for sbo in sorted(sbo_count.keys()):
-        print '%g\t%s\t%g'%(sbo_count[sbo], 'with SBO term', sbo)
+        print '%g\t%s\t%g' % (sbo_count[sbo], 'with SBO term', sbo)
 
     # species statistics by type
     appears_in_reaction = []
     for reaction in model.getListOfReactions():
-        for reactant in itertools.chain(reaction.getListOfReactants(), reaction.getListOfProducts()):
+        for reactant in itertools.chain(reaction.getListOfReactants(),
+                                        reaction.getListOfProducts()):
             sID = reactant.getSpecies()
             if sID not in appears_in_reaction:
                 appears_in_reaction.append(sID)
@@ -75,12 +81,12 @@ def model_stats(sbml, display_errors = False):
             nB += 1
         else:
             nM += 1
-    print '%g\t%s'%(nM, 'variable')
-    print '%g\t%s'%(nB, 'fixed')
-    print '%g\t%s'%(nE, 'non-reactants')
+    print '%g\t%s' % (nM, 'variable')
+    print '%g\t%s' % (nB, 'fixed')
+    print '%g\t%s' % (nE, 'non-reactants')
 
     # reaction statistics by SBO term
-    print '\n%g\t%s'%(model.getNumReactions(), 'reactions')
+    print '\n%g\t%s' % (model.getNumReactions(), 'reactions')
     sbo_count = {}
     for reaction in model.getListOfReactions():
         sbo = reaction.getSBOTerm()
@@ -88,25 +94,27 @@ def model_stats(sbml, display_errors = False):
             sbo_count[sbo] = 0
         sbo_count[sbo] += 1
         if display_errors and (sbo == -1):
-            print '%s\t%s\t%s'%('reaction', reaction.getId(), 'has no SBO term')
+            print '%s\t%s\t%s' % ('reaction', reaction.getId(),
+                                  'has no SBO term')
     for sbo in sorted(sbo_count.keys()):
-        print '%g\t%s\t%g'%(sbo_count[sbo], 'with SBO term', sbo)
+        print '%g\t%s\t%g' % (sbo_count[sbo], 'with SBO term', sbo)
 
     # reaction statistics by type
-    nR, nB = 0, 0
+    nB = 0
     rID_list = get_source_reactions(sbml)
-    print '%g\t%s'%(model.getNumReactions() - len(rID_list), 'non-source/sink')
-    print '%g\t%s'%(len(rID_list), 'source/sink')
+    print '%g\t%s' % (model.getNumReactions() - len(rID_list),
+                      'non-source/sink')
+    print '%g\t%s' % (len(rID_list), 'source/sink')
 
     # number of genes
     gene_list = get_list_of_genes(sbml)
-    print '\n%g\t%s'%(len(gene_list), 'genes')
+    print '\n%g\t%s' % (len(gene_list), 'genes')
 
 
 def get_list_of_genes(sbml):
-    """
+    '''
     Return list of all genes in model
-    """
+    '''
     model = sbml.getModel()
     gene_list = []
     for reaction in model.getListOfReactions():
@@ -118,12 +126,12 @@ def get_list_of_genes(sbml):
     return sorted(gene_list)
 
 
-def model_balancing(sbml, display_errors = False):
-    """
+def model_balancing(sbml, display_errors=False):
+    '''
     Checks elemental balancing for all reactions in model
-    """
+    '''
     model = sbml.getModel()
-    rID_list = get_source_reactions(sbml) # list of source/sink reactions
+    rID_list = get_source_reactions(sbml)  # list of source/sink reactions
     num_balanced, num_imbalanced, num_unknown = 0, 0, 0
 
     for reaction in model.getListOfReactions():
@@ -133,24 +141,26 @@ def model_balancing(sbml, display_errors = False):
             if unknown:
                 num_unknown += 1
                 if display_errors:
-                    print '\n%s\t%s\t%s\t[%s]'%('reaction', rID, 'unknown', formula)
+                    print '\n%s\t%s\t%s\t[%s]' % ('reaction', rID, 'unknown',
+                                                  formula)
             elif formula:
                 num_imbalanced += 1
                 if display_errors:
-                    print '\n%s\t%s\t%s\t[%s]'%('reaction', rID, 'unbalanced', formula)
+                    print '\n%s\t%s\t%s\t[%s]' % ('reaction', rID,
+                                                  'unbalanced', formula)
             else:
                 num_balanced += 1
             if display_errors and (unknown or formula):
                 print display_reaction_and_formula(rID, sbml)
 
     print ''
-    print '%g\t%s'%(num_balanced, 'reactions balanced')
-    print '%g\t%s'%(num_imbalanced, 'reactions unbalanced')
-    print '%g\t%s'%(num_unknown, 'reactions unknown')
+    print '%g\t%s' % (num_balanced, 'reactions balanced')
+    print '%g\t%s' % (num_imbalanced, 'reactions unbalanced')
+    print '%g\t%s' % (num_unknown, 'reactions unknown')
 
 
 def get_source_reactions(sbml):
-    """Determine source and sink reactions"""
+    '''Determine source and sink reactions'''
     model = sbml.getModel()
 
     rID_list = []
@@ -177,13 +187,12 @@ def get_source_reactions(sbml):
 
 
 def list_models():
-    """
+    '''
     model_names, model_path = list_models()
     returns
     model_names: list of SBML models in the directory ../models
     model_path: the full path to the directory ../models
-    """
-
+    '''
     tests_path = os.path.dirname(__file__)
     model_path = os.path.join(tests_path, '..', 'models')
     model_path = os.path.normpath(model_path)
@@ -197,10 +206,9 @@ def list_models():
 
 
 def max_fluxes(sbml):
-    """
+    '''
     Written to mimic neilswainston matlab function maxFluxes
-    """
-
+    '''
     media = [
         'EX_ca2(e)',
         'EX_cl(e)',
@@ -213,11 +221,11 @@ def max_fluxes(sbml):
         'EX_nh4(e)',
         'EX_so4(e)',
         'EX_pi(e)'
-        ]
+    ]
     objective = 'DM_atp_c_'
     print ''
-#     for normoxic in [True, False]:
-    for normoxic in [True,]:
+
+    for normoxic in [True, False]:
         for carbon_source in [
                 # sugars
                 'EX_glc(e)',
@@ -257,15 +265,15 @@ def max_fluxes(sbml):
                 'EX_trp_L(e)',
                 'EX_tyr_L(e)',
                 'EX_val_L(e)',
-                ]:
+        ]:
             f_opt = max_flux(sbml, carbon_source, objective, normoxic, media)
-            print '%s:\t%g'%(carbon_source, f_opt)
+            print '%s:\t%g' % (carbon_source, f_opt)
 
 
 def max_flux(sbml, carbon_source, objective, normoxic, media):
-    """
+    '''
     Written to mimic neilswainston matlab function maxFlux
-    """
+    '''
     set_infinite_bounds(sbml)
     # block import reactions
     block_all_imports(sbml)
@@ -280,26 +288,26 @@ def max_flux(sbml, carbon_source, objective, normoxic, media):
     # avoid infinities
     obj_max = 1e6
     change_rxn_bounds(sbml, objective, obj_max, 'u')
-    v_sol, f_opt = optimize_cobra_model(sbml)
+    _, f_opt = optimize_cobra_model(sbml)
     if f_opt > 0.9 * obj_max:
         f_opt = INF
     return f_opt
 
 
 def read_sbml(filename):
-    """
+    '''
     Read an SBML file from specified path.
-    Copied from Daaaaave: http://github.com/u003f/daaaaave/releases/tag/original
-    """
+
+    '''
     reader = libsbml.SBMLReader()
     sbml = reader.readSBMLFromFile(filename)
     return sbml
 
 
 def block_all_imports(sbml):
-    """
+    '''
     Written to mimic neilswainston matlab function blockAllImports
-    """
+    '''
     model = sbml.getModel()
 
     for rID in get_source_reactions(sbml):
@@ -321,10 +329,10 @@ def block_all_imports(sbml):
 
 
 def change_rxn_bounds(sbml, rxn_name_list, value, bound_type='b'):
-    """
-    Written to mimic the matlab function changeRxnBounds from http://opencobra.sf.net/
-    """
-    model = sbml.getModel()
+    '''
+    Written to mimic the matlab function changeRxnBounds from
+    http://opencobra.sf.net/
+    '''
     # convert single entries to lists
     if isinstance(rxn_name_list, str):
         rxn_name_list = [rxn_name_list]
@@ -335,7 +343,7 @@ def change_rxn_bounds(sbml, rxn_name_list, value, bound_type='b'):
     for index, rID in enumerate(rxn_name_list):
         reaction = get_reaction_by_id(sbml, rID)
         if not reaction:
-            print 'reaction %s not found'%rID
+            print 'reaction %s not found' % rID
         else:
             kineticLaw = reaction.getKineticLaw()
             if bound_type[index] in ['l', 'b']:
@@ -345,9 +353,10 @@ def change_rxn_bounds(sbml, rxn_name_list, value, bound_type='b'):
 
 
 def change_objective(sbml, rxn_name_list, objective_coeff=1):
-    """
-    Written to mimic the matlab function changeObjective from http://opencobra.sf.net/
-    """
+    '''
+    Written to mimic the matlab function changeObjective from
+    http://opencobra.sf.net/
+    '''
     model = sbml.getModel()
     for reaction in model.getListOfReactions():
         kineticLaw = reaction.getKineticLaw()
@@ -360,16 +369,18 @@ def change_objective(sbml, rxn_name_list, objective_coeff=1):
     for index, rID in enumerate(rxn_name_list):
         reaction = get_reaction_by_id(sbml, rID)
         if not reaction:
-            print 'reaction %s not found'%rID
+            print 'reaction %s not found' % rID
         else:
             kineticLaw = reaction.getKineticLaw()
-            kineticLaw.getParameter('OBJECTIVE_COEFFICIENT').setValue(objective_coeff[index])
+            kineticLaw.getParameter('OBJECTIVE_COEFFICIENT').setValue(
+                objective_coeff[index])
 
 
 def format_for_SBML_ID(txt):
-    """
-    Written to mimic the matlab function formatForSBMLID from http://opencobra.sf.net/
-    """
+    '''
+    Written to mimic the matlab function formatForSBMLID from
+    http://opencobra.sf.net/
+    '''
     txt = 'R_' + txt
     for symbol, replacement in [
             ('-', '_DASH_'),
@@ -391,25 +402,22 @@ def format_for_SBML_ID(txt):
 
 
 def optimize_cobra_model(sbml):
-    """
+    '''
     Replicate Cobra command optimizeCbModel(model,[],'one').
-    Copied from Daaaaave: http://github.com/u003f/daaaaave/releases/tag/original
-    """
-
+    '''
     bound = INF
     cobra = convert_sbml_to_cobra(sbml, bound)
 
     N, L, U = cobra['S'], list(cobra['lb']), list(cobra['ub'])
     f, b = list(cobra['c']), list(cobra['b'])
-    v_sol, f_opt, conv = easy_lp(f, N, b, L, U, one=False)
+    v_sol, f_opt, _ = easy_lp(f, N, b, L, U, one=False)
     return v_sol, f_opt
 
 
 def convert_sbml_to_cobra(sbml, bound=INF):
-    """
+    '''
     Get Cobra matrices from SBML model.
-    Copied from Daaaaave: http://github.com/u003f/daaaaave/releases/tag/original
-    """
+    '''
     model = sbml.getModel()
     S = sparse.lil_matrix((model.getNumSpecies(), model.getNumReactions()))
     lb, ub, c, b, rev, sIDs = [], [], [], [], [], []
@@ -445,7 +453,8 @@ def convert_sbml_to_cobra(sbml, bound=INF):
         ub.append(rxn_ub)
         c.append(rxn_c)
         rev.append(rxn_rev)
-    lb, ub, c, b = numpy.array(lb), numpy.array(ub), numpy.array(c), numpy.array(b)
+    lb, ub, c, b = numpy.array(lb), numpy.array(ub), numpy.array(c), \
+        numpy.array(b)
     rev = numpy.array(rev)
     cobra = {'S': S, 'lb': lb, 'ub': ub, 'c': c, 'b': b, 'rev': rev}
     return cobra
@@ -453,10 +462,8 @@ def convert_sbml_to_cobra(sbml, bound=INF):
 
 def easy_lp(f, a, b, vlb, vub, one=False):
     '''
-    Optimize lp using friends of Gurobi.
-    Copied from Daaaaave: http://github.com/u003f/daaaaave/releases/tag/original
+    Optimize lp using Gurobi.
     '''
-
     # create gurobi model
     lp = gurobipy.Model()
     lp.Params.OutputFlag = 0
@@ -478,7 +485,7 @@ def easy_lp(f, a, b, vlb, vub, one=False):
     S = a.tocsr()
     for i in xrange(rows):
         start = S.indptr[i]
-        end = S.indptr[i+1]
+        end = S.indptr[i + 1]
         variables = [lpvars[j] for j in S.indices[start:end]]
         coeff = S.data[start:end]
         expr = gurobipy.LinExpr(coeff, variables)
@@ -509,10 +516,10 @@ def easy_lp(f, a, b, vlb, vub, one=False):
         for i in xrange(nR):
             col = sparse.lil_matrix((nS + i, 1))
             a = sparse.hstack([a, col, col])
-            row = sparse.lil_matrix((1, nR+2*i+2))
+            row = sparse.lil_matrix((1, nR + 2 * i + 2))
             row[0, i] = 1.
-            row[0, nR+2*i] = 1.
-            row[0, nR+2*i+1] = -1.
+            row[0, nR + 2 * i] = 1.
+            row[0, nR + 2 * i + 1] = -1.
             a = sparse.vstack([a, row])
             vlb.append(0.)
             vlb.append(0.)
@@ -531,6 +538,7 @@ def easy_lp(f, a, b, vlb, vub, one=False):
 
 
 def get_reaction_by_id(sbml, rID):
+    '''Gets the reaction by id.'''
     model = sbml.getModel()
     reaction = model.getReaction(rID)
     if not reaction:
@@ -543,16 +551,19 @@ def get_reaction_by_id(sbml, rID):
             rID = rID[:-1]
         reaction = model.getReaction(rID)
     if not reaction:
-        # try adding "_in"
+        # try adding '_in'
         reaction = model.getReaction(rID + '_in')
     if not reaction:
         # try known alternatives
         rID_map = {
             'R_DM_atp_c': 'R_HKt',  # alternative ATPase
-            'R_EX_HC02175_LPAREN_e_RPAREN': 'R_EX_dca_LPAREN_e_RPAREN_',  # alternative C10:0
-            'R_EX_HC02176_LPAREN_e_RPAREN': 'R_EX_ddca_LPAREN_e_RPAREN_',  # alternative C12:0
-            'R_EX_docosac': 'R_EX_docosac_LPAREN_e_RPAREN_',  # alternative C22:0
-            }
+            # alternative C10:0
+            'R_EX_HC02175_LPAREN_e_RPAREN': 'R_EX_dca_LPAREN_e_RPAREN_',
+            # alternative C12:0
+            'R_EX_HC02176_LPAREN_e_RPAREN': 'R_EX_ddca_LPAREN_e_RPAREN_',
+            # alternative C22:0
+            'R_EX_docosac': 'R_EX_docosac_LPAREN_e_RPAREN_',
+        }
         if rID in rID_map:
             rID = rID_map[rID]
             reaction = get_reaction_by_id(sbml, rID)
@@ -560,6 +571,7 @@ def get_reaction_by_id(sbml, rID):
 
 
 def set_import_bounds(sbml, rxn_name_list, value):
+    '''Sets the import bounds.'''
     model = sbml.getModel()
     # convert single entries to lists
     if isinstance(rxn_name_list, str):
@@ -569,7 +581,7 @@ def set_import_bounds(sbml, rxn_name_list, value):
     for index, rID in enumerate(rxn_name_list):
         reaction = get_reaction_by_id(sbml, rID)
         if not reaction:
-            print 'reaction %s not found'%rID
+            print 'reaction %s not found' % rID
         else:
             nR, nP = 0, 0
             for reactant in reaction.getListOfReactants():
@@ -587,13 +599,13 @@ def set_import_bounds(sbml, rxn_name_list, value):
             elif (nR == 1) and (nP == 0):
                 kineticLaw.getParameter('LOWER_BOUND').setValue(-val)
             else:
-                print 'reaction %s not import'%rID
+                print 'reaction %s not import' % rID
 
 
 def set_infinite_bounds(sbml):
-    """
+    '''
     Set default bounds to INF, rather than 1000 (say)
-    """
+    '''
     model = sbml.getModel()
     for reaction in model.getListOfReactions():
         kineticLaw = reaction.getKineticLaw()
@@ -606,10 +618,10 @@ def set_infinite_bounds(sbml):
 
 
 def formula_to_map(formula):
-    """
-    Tranform a formula string 'C6H12O6' into a map dictionary {'C':6, 'H':12, 'O':6}
-    """
-
+    '''
+    Tranform a formula string 'C6H12O6' into a map dictionary {'C':6, 'H':12,
+    'O':6}
+    '''
     formula_map = {}
     # do not parse bracketing
     if ('(' in formula) or (')' in formula):
@@ -617,7 +629,7 @@ def formula_to_map(formula):
     # replace FULLR notation with R
     for R in ['FULLR3', 'FULLR2', 'FULLR']:
         formula = formula.replace(R, 'R')
-    m = re.findall('([A-Z][a-z]*)([\-]?[\d]*[\.]?[\d]*)', formula)
+    m = re.findall('([A-Z][a-z]*)([\\-]?[\\d]*[\\.]?[\\d]*)', formula)
     for duple in m:
         X = duple[0]
         n = duple[1]
@@ -636,10 +648,10 @@ def formula_to_map(formula):
 
 
 def map_to_formula(formula_map):
-    """
-    Tranform a map dictionary {'C':6, 'H':12, 'O':6} into a formula string 'C6H12O6'
-    """
-
+    '''
+    Tranform a map dictionary {'C':6, 'H':12, 'O':6} into a formula string
+    'C6H12O6'
+    '''
     formula = ''
     for X in formula_map.keys():
         if formula_map[X] == 0:
@@ -663,10 +675,9 @@ def map_to_formula(formula_map):
 
 
 def elementally_balance_reaction(rID, sbml):
-    """
+    '''
     Determine the overall elemental imbalance of a reaction
-    """
-    model = sbml.getModel()
+    '''
     reaction = sbml.getModel().getReaction(rID)
 
     unknown = False
@@ -675,26 +686,25 @@ def elementally_balance_reaction(rID, sbml):
         sID = reactant.getSpecies()
         formula = get_formula(sID, sbml)
         stoich = reactant.getStoichiometry()
-        if not formula_to_map(formula) and not (formula in ['.']):
+        if not formula_to_map(formula) and formula not in ['.']:
             unknown = True
         overall_formula = add_formulae(overall_formula, formula, -stoich)
     for reactant in reaction.getListOfProducts():
         sID = reactant.getSpecies()
         formula = get_formula(sID, sbml)
         stoich = reactant.getStoichiometry()
-        if not formula_to_map(formula) and not (formula in ['.']):
+        if not formula_to_map(formula) and formula not in ['.']:
             unknown = True
         overall_formula = add_formulae(overall_formula, formula, stoich)
 
     return overall_formula, unknown
 
 
-def add_formulae(formula, formula_new, stoich = 1.0):
-    """
+def add_formulae(formula, formula_new, stoich=1.0):
+    '''
     Calculate formula + stoich * formula_new
     e.g. formula = C6H12O6, formula_new = H2O, stoich = -6 -> C6
-    """
-
+    '''
     formula_map = formula_to_map(formula)
     formula_map_new = formula_to_map(formula_new)
 
@@ -706,15 +716,16 @@ def add_formulae(formula, formula_new, stoich = 1.0):
 
 
 def get_formula(sID, sbml):
-    """
+    '''
     Get the formula of species with ID sID
-    """
+    '''
     return get_notes_field(sID, 'FORMULA', sbml)
 
 
 def get_notes_field(eID, name, sbml):
-    """
-    """
+    '''
+    Gets the notes field.
+    '''
     element = sbml.getModel().getElementBySId(eID)
     try:
         notes = element.getNotesString()
@@ -722,18 +733,18 @@ def get_notes_field(eID, name, sbml):
         f = f.group(1)
         f = f.strip()
     except:
-         f = ''
+        f = ''
     return f
 
 
 def display_reaction_and_formula(rID, sbml):
-    """
+    '''
     Display reaction, with formulae below each reactant.
-    """
+    '''
     model = sbml.getModel()
     reaction = model.getReaction(rID)
 
-    txt, txt_formula = '', ''
+    txt = ''
     txt_formula = ''
 
     for index, reactant in enumerate(reaction.getListOfReactants()):
