@@ -3,6 +3,7 @@ Various tests to compare different flavours of recon 2.
 Updated: 10 Apr 15 by Kieran Smallbone
 '''
 # pylint: disable=invalid-name
+# pylint: disable=no-member
 # pylint: disable=too-many-arguments
 # pylint: disable=too-many-branches
 # pylint: disable=too-many-locals
@@ -267,7 +268,9 @@ def max_fluxes(sbml):
                 'EX_val_L(e)',
         ]:
             f_opt = max_flux(sbml, carbon_source, objective, normoxic, media)
-            print '%s:\t%g' % (carbon_source, f_opt)
+            print '%s (%s):\t%g' % (carbon_source,
+                                    'normoxic' if normoxic else 'anaerobic',
+                                    f_opt)
 
 
 def max_flux(sbml, carbon_source, objective, normoxic, media):
@@ -727,14 +730,9 @@ def get_notes_field(eID, name, sbml):
     Gets the notes field.
     '''
     element = sbml.getModel().getElementBySId(eID)
-    try:
-        notes = element.getNotesString()
-        f = re.search(name + ':([^<]+)', notes)
-        f = f.group(1)
-        f = f.strip()
-    except:
-        f = ''
-    return f
+    notes = element.getNotesString()
+    f = re.search(name + ':([^<]+)', notes)
+    return f.group(1).strip() if f is not None else ''
 
 
 def display_reaction_and_formula(rID, sbml):
