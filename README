@@ -3,3 +3,14 @@ These files describe iterative improvements to the "recon 2" model of human meta
 /models contains our ongoing improvements, along with various recon 2 derivatives published by other groups.
 
 /tests contains various unit tests that may be applied to these models.
+
+To run tests, navigate to /tests directory from a Command Prompt / Terminal window, and type:
+
+python recon_tests.py
+
+These scripts have dependencies on the following Python libraries:
+
+* NumPy (http://www.numpy.org)
+* SciPy (https://www.scipy.org) 
+* Gurobipy (http://www.gurobi.com)
+* libsbml (http://sbml.org/Software/libSBML)
